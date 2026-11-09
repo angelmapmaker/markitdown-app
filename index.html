@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conversor a Markdown</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6a66;
+    --line: #e2e0da; --accent: #2f6f5e; --accent-ink: #fff; --err: #b3261e; --ok: #2f6f5e;
+    --code: #fbfaf7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161615; --panel: #1f1f1d; --text: #ecebe7; --muted: #9c9a94;
+      --line: #33322f; --accent: #6fbfa6; --accent-ink: #10201b; --err: #f2867c; --ok: #6fbfa6; --code: #1a1a18; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, "Segoe UI", sans-serif; }
+  main { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .grid { display: grid; grid-template-columns: 380px 1fr; gap: 16px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+  .tab { background: none; border: 0; padding: 8px 12px; cursor: pointer; color: var(--muted);
+    border-bottom: 2px solid transparent; font: inherit; }
+  .tab.on { color: var(--text); border-color: var(--accent); font-weight: 600; }
+  .pane { display: none; } .pane.on { display: block; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  input[type=text] { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--code); color: var(--text); font: inherit; }
+  button.btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 6px;
+    padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; margin-top: 10px; }
+  button.ghost { background: none; color: var(--text); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; cursor: wait; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .check { display: flex; gap: 8px; align-items: center; margin: 6px 0; font-size: 14px; color: var(--text); }
+  .files { max-height: 320px; overflow: auto; margin-top: 10px; border: 1px solid var(--line); border-radius: 6px; }
+  .file { display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px; cursor: pointer;
+    border-bottom: 1px solid var(--line); font-size: 14px; }
+  .file:last-child { border-bottom: 0; }
+  .file:hover { background: var(--code); }
+  .file .s { color: var(--muted); white-space: nowrap; }
+  .file.done .n::before { content: "✓ "; color: var(--ok); }
+  .file.fail .n::before { content: "✗ "; color: var(--err); }
+  .drop { border: 2px dashed var(--line); border-radius: 8px; padding: 28px 12px; text-align: center;
+    color: var(--muted); cursor: pointer; }
+  .drop.over { border-color: var(--accent); color: var(--text); }
+  .opts { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .out-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .meta { color: var(--muted); font-size: 13px; }
+  textarea { width: 100%; min-height: 60vh; margin-top: 10px; padding: 12px; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--code); color: var(--text);
+    font: 13px/1.5 ui-monospace, Consolas, monospace; resize: vertical; }
+  .chapters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; max-height: 180px; overflow: auto; }
+  .chap { background: var(--code); color: var(--text); border: 1px solid var(--line); border-radius: 999px;
+    padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #redoBtn.changed { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .chap.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .chap small { opacity: .7; }
+  .hint { color: var(--muted); font-size: 12px; margin: -2px 0 6px 24px; }
+  .msg { margin-top: 8px; font-size: 13px; min-height: 18px; overflow-wrap: anywhere; }
+  .msg.err { color: var(--err); } .msg.ok { color: var(--ok); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Conversor a Markdown</h1>
+  <p class="sub">Convierte documentos y videos de YouTube a Markdown limpio para gastar menos tokens. Usa MarkItDown en tu PC.</p>
+
+  <div class="grid">
+    <section class="card">
+      <div class="tabs">
+        <button class="tab on" data-p="folder">Carpeta</button>
+        <button class="tab" data-p="upload">Archivo</button>
+        <button class="tab" data-p="yt">YouTube</button>
+      </div>
+
+      <div class="pane on" id="p-folder">
+        <label for="folder">Ruta de la carpeta</label>
+        <input type="text" id="folder" placeholder="C:\Users\tu_usuario\Documents">
+        <label class="check"><input type="checkbox" id="recursive"> Incluir subcarpetas</label>
+        <div class="row">
+          <button class="btn" id="listBtn">Ver archivos</button>
+          <button class="btn ghost" id="allBtn" disabled>Convertir todos</button>
+        </div>
+        <div class="files" id="files" hidden></div>
+      </div>
+
+      <div class="pane" id="p-upload">
+        <div class="drop" id="drop">Arrastra un archivo aquí o haz clic para elegirlo
+          <br><small>PDF, Word, PowerPoint, Excel, HTML, CSV, EPUB, imágenes, audio…</small></div>
+        <input type="file" id="fileInput" hidden>
+      </div>
+
+      <div class="pane" id="p-yt">
+        <label for="yt">Enlace de YouTube</label>
+        <input type="text" id="yt" placeholder="https://www.youtube.com/watch?v=...">
+        <label for="langs">Idiomas de subtítulos (por prioridad)</label>
+        <input type="text" id="langs" value="es,en">
+        <button class="btn" id="ytBtn">Convertir video</button>
+      </div>
+
+      <div class="opts">
+        <label class="check"><input type="checkbox" id="fix" checked> Reparar tildes y símbolos raros (Ã³ → ó)</label>
+        <label class="check"><input type="checkbox" id="compact" checked> Compactar (quitar espacios, líneas vacías e imágenes base64)</label>
+        <label>Dividir el resultado (libros y PDFs grandes)</label>
+        <label class="check"><input type="radio" name="mode" value="none" checked> No dividir</label>
+        <label class="check"><input type="radio" name="mode" value="chapters"> Por capítulos (detectados automáticamente)</label>
+        <p class="hint">Usa los marcadores del PDF, el índice del libro o las líneas «Capítulo N». Guarda en <code>nombre_capitulos</code>.</p>
+        <label class="check"><input type="radio" name="mode" value="parts"> En
+          <input type="number" id="parts" min="2" max="200" value="4" style="width:64px"> partes iguales</label>
+        <p class="hint">Corta en el párrafo más cercano para no partir frases. Guarda en <code>nombre_partes</code>.</p>
+        <p class="hint" style="margin-left:0">En el resultado, Ctrl+clic junta varias partes o capítulos en un solo .md.</p>
+        <label class="check"><input type="checkbox" id="save" checked> Guardar el .md en disco</label>
+        <label for="outDir">Carpeta de salida (vacío = junto al original)</label>
+        <input type="text" id="outDir" placeholder="Junto al archivo original">
+      </div>
+      <div class="msg" id="msg"></div>
+    </section>
+
+    <section class="card">
+      <div class="out-head">
+        <div><strong id="outTitle">Resultado</strong> <span class="meta" id="meta"></span></div>
+        <div class="row">
+          <button class="btn" id="redoBtn" style="margin:0" hidden title="Convierte otra vez el último archivo o video con las opciones actuales">↻ Volver a convertir</button>
+          <button class="btn ghost" id="copyBtn" style="margin:0">Copiar</button>
+          <button class="btn ghost" id="dlBtn" style="margin:0">Descargar .md</button>
+        </div>
+      </div>
+      <div class="chapters" id="chapters" hidden></div>
+      <textarea id="out" spellcheck="false" placeholder="Aquí aparecerá el Markdown…"></textarea>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+for (const k of ["folder", "outDir", "langs"]) {
+  const v = store.get(k); if (v) $(k).value = v;
+  $(k).addEventListener("change", () => store.set(k, $(k).value));
+}
+const modeEl = v => document.querySelector(`input[name=mode][value=${v}]`);
+const savedMode = store.get("mode") || (store.get("split") === "1" ? "chapters" : "none");
+if (modeEl(savedMode)) modeEl(savedMode).checked = true;
+document.querySelectorAll("input[name=mode]").forEach(r => r.addEventListener("change", () => store.set("mode", r.value)));
+if (store.get("parts")) $("parts").value = store.get("parts");
+$("parts").addEventListener("change", () => store.set("parts", $("parts").value));
+$("parts").addEventListener("focus", () => { modeEl("parts").checked = true; store.set("mode", "parts"); });
+const splitMode = () => document.querySelector("input[name=mode]:checked").value;
+
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === t));
+  document.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.id === "p-" + t.dataset.p));
+});
+
+const opts = () => ({ fix: $("fix").checked, compact: $("compact").checked, save: $("save").checked, splitMode: splitMode(), parts: +$("parts").value || 2,
+  outDir: $("outDir").value.trim().replace(/^"|"$/g, ""), langs: $("langs").value });
+const msg = (t, cls = "") => { $("msg").textContent = t; $("msg").className = "msg " + cls; };
+const kb = n => n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : (n / 1048576).toFixed(1) + " MB";
+let currentName = "resultado";
+
+async function api(path, body) {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+// "Capítulo 5. Título" -> "cap5", "Parte II" -> "parte2", "Preliminares" -> "prelim"; si no, la posición.
+const ROMAN = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, m: 1000 };
+const roman = s => [...s.toLowerCase()].reduce((acc, ch, k, arr) =>
+  ROMAN[ch] < (ROMAN[arr[k + 1]] || 0) ? acc - ROMAN[ch] : acc + ROMAN[ch], 0);
+function capTag(title, i) {
+  const t = title.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  if (/^preliminares/.test(t)) return "prelim";
+  const m = t.match(/^\s*(capitulo|chapter|cap\.?|parte|part|leccion|unidad|tema|libro|book)\s+([0-9]+|[ivxlcdm]+)\b/);
+  if (m) {
+    const kind = { capitulo: "cap", chapter: "cap", "cap": "cap", "cap.": "cap", parte: "parte", part: "parte",
+      leccion: "leccion", unidad: "unidad", tema: "tema", libro: "libro", book: "libro" }[m[1]];
+    return kind + (/^\d+$/.test(m[2]) ? +m[2] : roman(m[2]));
+  }
+  return "cap" + (i + 1);
+}
+
+function view(md, title, fileName, chars, tokens) {
+  currentName = fileName;
+  $("out").value = md;
+  $("outTitle").textContent = title;
+  $("meta").textContent = `· ${chars.toLocaleString()} caracteres · ~${tokens.toLocaleString()} tokens`;
+}
+
+function show(res, name) {
+  const base = name.replace(/\.[^.]+$/, "") || "resultado";
+  const box = $("chapters"); box.innerHTML = "";
+  box.hidden = !res.chapters;
+  view(res.markdown, name, base, res.chars, res.tokens);
+  if (res.chapters) {
+    const chs = res.chapters;
+    const pad = Math.max(2, String(chs.length).length);
+    const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const sel = new Set(); let last = null;
+    const all = document.createElement("button");
+    all.className = "chap on"; all.textContent = "Todo";
+    all.onclick = () => {
+      sel.clear(); last = null; paint(); view(res.markdown, name, base, res.chars, res.tokens);
+      msg(`Libro completo → se descargará como ${base}.md`, "ok");
+    };
+    box.appendChild(all);
+    const chips = chs.map((c, i) => {
+      const b = document.createElement("button");
+      b.className = "chap"; b.title = c.title + "  (Ctrl+clic: elegir varios · Mayús+clic: rango)";
+      b.innerHTML = `${String(i + 1).padStart(pad, "0")} ${esc(c.title)} <small>~${c.tokens.toLocaleString()}</small>`;
+      b.onclick = e => {
+        if (e.shiftKey && last !== null) {
+          const [a, z] = [Math.min(last, i), Math.max(last, i)];
+          for (let k = a; k <= z; k++) sel.add(k);
+        } else if (e.ctrlKey || e.metaKey) {
+          sel.has(i) ? sel.delete(i) : sel.add(i);
+        } else { sel.clear(); sel.add(i); }
+        last = i; paint(); showSel();
+      };
+      box.appendChild(b); return b;
+    });
+    function paint() {
+      all.classList.toggle("on", sel.size === 0);
+      chips.forEach((b, i) => b.classList.toggle("on", sel.has(i)));
+    }
+    function showSel() {
+      if (!sel.size) return all.onclick();
+      const idx = [...sel].sort((a, b) => a - b);
+      const md = idx.map(i => chs[i].markdown.trim()).join("\n\n---\n\n") + "\n";
+      const tag = idx.map(i => capTag(chs[i].title, i)).join("_");
+      const title = idx.length === 1 ? `${name} › ${chs[idx[0]].title}` : `${name} › ${idx.length} capítulos`;
+      view(md, title, `${base}_${tag}`, md.length, Math.max(1, Math.floor(md.length / 4)));
+      msg(`Seleccionados: ${idx.map(i => chs[i].title).join(", ")} → se descargará como ${base}_${tag}.md`, "ok");
+    }
+    msg((res.mode === "parts" ? `${chs.length} partes iguales (~${chs[0].tokens.toLocaleString()} tokens c/u). `
+      : `${chs.length} capítulos (según ${res.method}). `) +
+      (res.saved ? "Guardados en: " + res.saved + ". " : "") + "Clic para ver uno; Ctrl+clic para juntar varios.", "ok");
+    return;
+  }
+  msg((res.note ? res.note + " " : "") + (res.saved ? "Guardado en: " + res.saved : "Convertido."), res.note ? "" : "ok");
+}
+
+const APP_URL = "http://127.0.0.1:8765";
+const NOT_SERVED = !/^https?:$/.test(location.protocol);   // file:, data: (vista previa), etc.
+const NO_SERVER = NOT_SERVED
+  ? `Abriste index.html como archivo. Ejecuta iniciar.bat y usa la app en ${APP_URL}`
+  : `No hay conexión con el servidor. Ejecuta iniciar.bat (o revisa que su ventana siga abierta) y recarga ${APP_URL}`;
+if (NOT_SERVED) {
+  const b = document.createElement("p");
+  b.className = "msg err";
+  b.innerHTML = `Esta página está abierta como archivo y no puede convertir. Ejecuta <b>iniciar.bat</b> y abre <a href="${APP_URL}">${APP_URL}</a>.`;
+  document.querySelector(".sub").after(b);
+}
+
+async function run(label, fn, btns = []) {
+  btns.forEach(b => b.disabled = true);
+  msg(label + "…");
+  try { await fn(); } catch (e) { msg(e instanceof TypeError && /fetch|network/i.test(e.message) ? NO_SERVER : e.message, "err"); }
+  finally { btns.forEach(b => b.disabled = false); }
+}
+
+// Carpeta
+let listed = [];
+$("listBtn").onclick = () => run("Leyendo carpeta", async () => {
+  const j = await api("/api/list", { folder: $("folder").value, recursive: $("recursive").checked });
+  listed = j.files;
+  const box = $("files"); box.hidden = false; box.innerHTML = "";
+  if (!listed.length) { box.innerHTML = '<div class="file">No hay archivos compatibles.</div>'; }
+  listed.forEach(f => {
+    const el = document.createElement("div");
+    el.className = "file";
+    el.innerHTML = `<span class="n"></span><span class="s">${kb(f.size)}</span>`;
+    el.querySelector(".n").textContent = f.name;
+    el.onclick = () => convertFile(f, el);
+    f.el = el; box.appendChild(el);
+  });
+  $("allBtn").disabled = !listed.length;
+  msg(`${listed.length} archivo(s) encontrados. Haz clic en uno para convertirlo.`, "ok");
+}, [$("listBtn")]);
+
+// "Volver a convertir": recuerda la última conversión y la repite con las opciones actuales
+let redo = null;
+function remember(label, fn) {
+  redo = fn;
+  $("redoBtn").hidden = false; $("redoBtn").classList.remove("changed");
+  $("redoBtn").title = `Convierte otra vez «${label}» con las opciones actuales`;
+}
+$("redoBtn").onclick = () => redo && redo();
+document.querySelector(".opts").addEventListener("change", () => {
+  if (redo) { $("redoBtn").classList.add("changed"); msg("Cambiaste la configuración: pulsa «↻ Volver a convertir» para aplicarla.", ""); }
+});
+
+async function convertFile(f, el) {
+  remember(f.name, () => convertFile(f, el));
+  await run("Convirtiendo " + f.name, async () => {
+    try {
+      const res = await api("/api/convert", { path: f.path, opts: opts() });
+      el.classList.add("done"); el.classList.remove("fail"); show(res, f.name);
+    } catch (e) { el.classList.add("fail"); throw e; }
+  }, [$("redoBtn")]);
+}
+
+$("allBtn").onclick = () => run("Convirtiendo todos", async () => {
+  if (!$("save").checked) $("save").checked = true;
+  let ok = 0, bad = 0;
+  for (const [i, f] of listed.entries()) {
+    msg(`Convirtiendo ${i + 1}/${listed.length}: ${f.name}`);
+    try { show(await api("/api/convert", { path: f.path, opts: opts() }), f.name); f.el.classList.add("done"); ok++; }
+    catch { f.el.classList.add("fail"); bad++; }
+  }
+  msg(`Listo: ${ok} convertidos${bad ? `, ${bad} con error` : ""}.`, bad ? "err" : "ok");
+}, [$("allBtn"), $("listBtn")]);
+
+// Subir archivo
+const drop = $("drop");
+drop.onclick = () => $("fileInput").click();
+$("fileInput").onchange = e => e.target.files[0] && upload(e.target.files[0]);
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); e.dataTransfer.files[0] && upload(e.dataTransfer.files[0]); };
+
+function upload(file) {
+  remember(file.name, () => upload(file));
+  run("Convirtiendo " + file.name, async () => {
+    const r = await fetch("/api/upload", { method: "POST", body: file,
+      headers: { "X-Filename": encodeURIComponent(file.name), "X-Opts": encodeURIComponent(JSON.stringify(opts())) } });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error);
+    show(j, file.name);
+  }, [$("redoBtn")]);
+}
+
+// YouTube
+function convertYt(url) {
+  remember("video de YouTube", () => convertYt(url));
+  return run("Descargando transcripción", async () => {
+    show(await api("/api/convert", { url, opts: opts() }), "youtube");
+  }, [$("ytBtn"), $("redoBtn")]);
+}
+$("ytBtn").onclick = () => {
+  const url = $("yt").value.trim();
+  if (!url) return msg("Pega un enlace de YouTube.", "err");
+  convertYt(url);
+};
+
+// Salida
+$("copyBtn").onclick = async () => {
+  try { await navigator.clipboard.writeText($("out").value); msg("Copiado al portapapeles.", "ok"); }
+  catch { $("out").select(); document.execCommand("copy"); msg("Copiado.", "ok"); }
+};
+$("dlBtn").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([$("out").value], { type: "text/markdown;charset=utf-8" }));
+  a.download = currentName + ".md"; a.click(); URL.revokeObjectURL(a.href);
+};
+</script>
+</body>
+</html>

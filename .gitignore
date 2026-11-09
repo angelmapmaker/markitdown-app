@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+
+# Archivos de prueba y resultados de conversiones
+prueba/
+*_capitulos/
+*_partes/
+*.converted.md
+
+# graphify (se regenera con: graphify update .)
+graphify-out/
+
+# Configuración local de Claude Code (contiene rutas de esta PC)
+.claude/
+
+# Sistema
+Thumbs.db
+desktop.ini
